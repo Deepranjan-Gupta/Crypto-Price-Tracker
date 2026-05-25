@@ -1,0 +1,36 @@
+import React from 'react';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import { useCrypto } from '@/contexts/CryptoContext';
+import { CURRENCY_NAMES } from '@shared/types';
+import type { Currency } from '@shared/types';
+
+const CURRENCIES: Currency[] = ['usd', 'eur', 'gbp', 'jpy', 'aud', 'cad', 'chf', 'cny', 'inr', 'krw'];
+
+interface CurrencySelectorProps {
+  className?: string;
+}
+
+export function CurrencySelector({ className = '' }: CurrencySelectorProps) {
+  const { currency, setCurrency } = useCrypto();
+
+  return (
+    <Select value={currency} onValueChange={(value) => setCurrency(value as Currency)}>
+      <SelectTrigger className={`w-32 bg-input border-border hover:border-neon-green focus:border-neon-cyan ${className}`}>
+        <SelectValue />
+      </SelectTrigger>
+      <SelectContent className="bg-card border-border">
+        {CURRENCIES.map((curr) => (
+          <SelectItem key={curr} value={curr}>
+            {CURRENCY_NAMES[curr as Currency]}
+          </SelectItem>
+        ))}
+      </SelectContent>
+    </Select>
+  );
+}

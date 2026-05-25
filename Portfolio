@@ -1,0 +1,308 @@
+import React, { useState } from 'react';
+import DashboardLayout from '@/components/DashboardLayout';
+import { Card } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { Badge } from '@/components/ui/badge';
+import { trpc } from '@/lib/trpc';
+import { useCrypto } from '@/contexts/CryptoContext';
+import { formatCurrency, formatPercentage, getPercentageColorClass } from '@/utils/formatters';
+import { toast } from 'sonner';
+import { Plus, Trash2, TrendingUp, TrendingDown } from 'lucide-react';
+import { Skeleton } from '@/components/ui/skeleton';
+
+export default function Portfolio() {
+  const { currency } = useCrypto();
+  const [isOpen, setIsOpen] = useState(false);
+  const [formData, setFormData] = useState({
+    coinId: '',
+    coinName: '',
+    coinSymbol: '',
+    quantity: '',
+    purchasePrice: '',
+    purchaseDate: new Date().toISOString().split('T')[0],
+  });
+
+  // Fetch portfolio holdings
+  const { data: holdings = [], isLoading, refetch } = trpc.portfolio.getHoldings.useQuery();
+
+  // Add holding mutation
+  const addHoldingMutation = trpc.portfolio.addHolding.useMutation({
+    onSuccess: () => {
+      toast.success('Holding added successfully');
+      setFormData({
+        coinId: '',
+        coinName: '',
+        coinSymbol: '',
+        quantity: '',
+        purchasePrice: '',
+        purchaseDate: new Date().toISOString().split('T')[0],
+      });
+      setIsOpen(false);
+      refetch();
+    },
+    onError: (error) => {
+      toast.error(error.message || 'Failed to add holding');
+    },
+  });
+
+  // Delete holding mutation
+  const deleteHoldingMutation = trpc.portfolio.deleteHolding.useMutation({
+    onSuccess: () => {
+      toast.success('Holding removed');
+      refetch();
+    },
+    onError: (error) => {
+      toast.error(error.message || 'Failed to delete holding');
+    },
+  });
+
+  const handleAddHolding = () => {
+    if (!formData.coinId || !formData.quantity || !formData.purchasePrice) {
+      toast.error('Please fill in all fields');
+      return;
+    }
+
+    addHoldingMutation.mutate({
+      coinId: formData.coinId,
+      coinName: formData.coinName,
+      coinSymbol: formData.coinSymbol,
+      quantity: formData.quantity,
+      purchasePrice: formData.purchasePrice,
+      purchaseDate: new Date(formData.purchaseDate),
+    });
+  };
+
+  // Calculate portfolio stats
+  const totalInvested = holdings.reduce((sum, h) => {
+    const qty = parseFloat(h.quantity as any);
+    const price = parseFloat(h.purchasePrice as any);
+    return sum + (qty * price);
+  }, 0);
+
+  const portfolioAllocation = holdings.map(h => {
+    const qty = parseFloat(h.quantity as any);
+    const price = parseFloat(h.purchasePrice as any);
+    const invested = qty * price;
+    return {
+      ...h,
+      invested,
+      allocation: totalInvested > 0 ? (invested / totalInvested) * 100 : 0,
+    };
+  });
+
+  return (
+    <DashboardLayout>
+      <div className="space-y-6">
+        {/* Header */}
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-4xl font-bold text-neon-green mb-2">Portfolio</h1>
+            <p className="text-muted-foreground">Manage your cryptocurrency holdings</p>
+          </div>
+          <Dialog open={isOpen} onOpenChange={setIsOpen}>
+            <DialogTrigger asChild>
+              <Button className="gap-2 bg-neon-green text-navy-950 hover:bg-neon-cyan">
+                <Plus className="w-4 h-4" />
+                Add Holding
+              </Button>
+            </DialogTrigger>
+            <DialogContent className="bg-card border-border">
+              <DialogHeader>
+                <DialogTitle>Add Cryptocurrency Holding</DialogTitle>
+              </DialogHeader>
+              <div className="space-y-4">
+                <div>
+                  <Label htmlFor="coin-id">Coin ID (e.g., bitcoin)</Label>
+                  <Input
+                    id="coin-id"
+                    placeholder="bitcoin"
+                    value={formData.coinId}
+                    onChange={(e) => setFormData({ ...formData, coinId: e.target.value })}
+                    className="bg-input border-border"
+                  />
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <Label htmlFor="coin-name">Coin Name</Label>
+                    <Input
+                      id="coin-name"
+                      placeholder="Bitcoin"
+                      value={formData.coinName}
+                      onChange={(e) => setFormData({ ...formData, coinName: e.target.value })}
+                      className="bg-input border-border"
+                    />
+                  </div>
+                  <div>
+                    <Label htmlFor="coin-symbol">Symbol</Label>
+                    <Input
+                      id="coin-symbol"
+                      placeholder="BTC"
+                      value={formData.coinSymbol}
+                      onChange={(e) => setFormData({ ...formData, coinSymbol: e.target.value })}
+                      className="bg-input border-border"
+                    />
+                  </div>
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <Label htmlFor="quantity">Quantity</Label>
+                    <Input
+                      id="quantity"
+                      type="number"
+                      placeholder="0.5"
+                      step="0.00000001"
+                      value={formData.quantity}
+                      onChange={(e) => setFormData({ ...formData, quantity: e.target.value })}
+                      className="bg-input border-border"
+                    />
+                  </div>
+                  <div>
+                    <Label htmlFor="purchase-price">Purchase Price</Label>
+                    <Input
+                      id="purchase-price"
+                      type="number"
+                      placeholder="45000"
+                      step="0.01"
+                      value={formData.purchasePrice}
+                      onChange={(e) => setFormData({ ...formData, purchasePrice: e.target.value })}
+                      className="bg-input border-border"
+                    />
+                  </div>
+                </div>
+                <div>
+                  <Label htmlFor="purchase-date">Purchase Date</Label>
+                  <Input
+                    id="purchase-date"
+                    type="date"
+                    value={formData.purchaseDate}
+                    onChange={(e) => setFormData({ ...formData, purchaseDate: e.target.value })}
+                    className="bg-input border-border"
+                  />
+                </div>
+                <Button
+                  onClick={handleAddHolding}
+                  disabled={addHoldingMutation.isPending}
+                  className="w-full bg-neon-green text-navy-950 hover:bg-neon-cyan"
+                >
+                  {addHoldingMutation.isPending ? 'Adding...' : 'Add Holding'}
+                </Button>
+              </div>
+            </DialogContent>
+          </Dialog>
+        </div>
+
+        {/* Portfolio Summary */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <Card className="cyber-card">
+            <div className="p-4 space-y-2">
+              <p className="text-sm text-muted-foreground">Total Invested</p>
+              <p className="text-2xl font-bold text-neon-green">
+                {formatCurrency(totalInvested, currency)}
+              </p>
+            </div>
+          </Card>
+          <Card className="cyber-card">
+            <div className="p-4 space-y-2">
+              <p className="text-sm text-muted-foreground">Holdings</p>
+              <p className="text-2xl font-bold text-neon-cyan">{holdings.length}</p>
+            </div>
+          </Card>
+          <Card className="cyber-card">
+            <div className="p-4 space-y-2">
+              <p className="text-sm text-muted-foreground">Portfolio Value</p>
+              <p className="text-2xl font-bold text-neon-green">
+                {formatCurrency(totalInvested, currency)}
+              </p>
+            </div>
+          </Card>
+        </div>
+
+        {/* Holdings Table */}
+        <Card className="cyber-card overflow-hidden">
+          <div className="overflow-x-auto">
+            {isLoading ? (
+              <div className="p-6 space-y-2">
+                {[...Array(3)].map((_, i) => (
+                  <Skeleton key={i} className="h-12" />
+                ))}
+              </div>
+            ) : holdings.length > 0 ? (
+              <Table>
+                <TableHeader>
+                  <TableRow className="border-border hover:bg-transparent">
+                    <TableHead className="text-neon-green">Coin</TableHead>
+                    <TableHead className="text-right text-neon-green">Quantity</TableHead>
+                    <TableHead className="text-right text-neon-green">Purchase Price</TableHead>
+                    <TableHead className="text-right text-neon-green">Total Invested</TableHead>
+                    <TableHead className="text-right text-neon-green">Allocation</TableHead>
+                    <TableHead className="text-right text-neon-green">Actions</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {portfolioAllocation.map((holding) => (
+                    <TableRow key={holding.id} className="border-border hover:bg-muted/50">
+                      <TableCell className="font-semibold">
+                        <div>
+                          <p>{holding.coinName}</p>
+                          <Badge variant="outline" className="text-xs mt-1">
+                            {holding.coinSymbol.toUpperCase()}
+                          </Badge>
+                        </div>
+                      </TableCell>
+                      <TableCell className="text-right">
+                        {parseFloat(holding.quantity as any).toFixed(8)}
+                      </TableCell>
+                      <TableCell className="text-right">
+                        {formatCurrency(parseFloat(holding.purchasePrice as any), currency)}
+                      </TableCell>
+                      <TableCell className="text-right font-semibold text-neon-green">
+                        {formatCurrency(holding.invested, currency)}
+                      </TableCell>
+                      <TableCell className="text-right">
+                        <div className="flex items-center justify-end gap-2">
+                          <div className="w-16 bg-muted rounded-full h-2">
+                            <div
+                              className="bg-neon-green h-2 rounded-full"
+                              style={{ width: `${holding.allocation}%` }}
+                            />
+                          </div>
+                          <span className="text-xs w-8 text-right">{holding.allocation.toFixed(1)}%</span>
+                        </div>
+                      </TableCell>
+                      <TableCell className="text-right">
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => deleteHoldingMutation.mutate({ id: holding.id })}
+                          disabled={deleteHoldingMutation.isPending}
+                          className="text-red-500 hover:text-red-600 hover:bg-red-500/10"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </Button>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            ) : (
+              <div className="p-12 text-center">
+                <p className="text-muted-foreground mb-4">No holdings yet</p>
+                <Button
+                  onClick={() => setIsOpen(true)}
+                  className="gap-2 bg-neon-green text-navy-950 hover:bg-neon-cyan"
+                >
+                  <Plus className="w-4 h-4" />
+                  Add Your First Holding
+                </Button>
+              </div>
+            )}
+          </div>
+        </Card>
+      </div>
+    </DashboardLayout>
+  );
+}

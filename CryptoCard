@@ -1,0 +1,113 @@
+import React from 'react';
+import { Card } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
+import type { CryptoMarketData } from '@shared/types';
+import { formatCurrency, formatPercentage, getPercentageColorClass } from '@/utils/formatters';
+import { useCrypto } from '@/contexts/CryptoContext';
+import { Link } from 'wouter';
+import { TrendingUp, TrendingDown } from 'lucide-react';
+
+interface CryptoCardProps {
+  crypto: CryptoMarketData;
+  onClick?: () => void;
+  showSparkline?: boolean;
+  compact?: boolean;
+}
+
+export function CryptoCard({ crypto, onClick, showSparkline = false, compact = false }: CryptoCardProps) {
+  const { currency } = useCrypto();
+  const isPositive = (crypto.price_change_percentage_24h ?? 0) >= 0;
+
+  if (compact) {
+    return (
+      <Link href={`/coin/${crypto.id}`}>
+        <div className="cyber-card hover:neon-glow cursor-pointer group">
+          <div className="flex items-center gap-3">
+            <img src={crypto.image} alt={crypto.name} className="w-8 h-8 rounded-full" />
+            <div className="flex-1 min-w-0">
+              <div className="flex items-center gap-2">
+                <span className="font-semibold text-sm truncate">{crypto.symbol.toUpperCase()}</span>
+                <Badge variant="outline" className="text-xs">
+                  #{crypto.market_cap_rank}
+                </Badge>
+              </div>
+              <p className="text-xs text-muted-foreground">{crypto.name}</p>
+            </div>
+            <div className="text-right">
+              <p className="font-bold text-sm">{formatCurrency(crypto.current_price, currency)}</p>
+              <p className={`text-xs font-semibold ${getPercentageColorClass(crypto.price_change_percentage_24h)}`}>
+                {formatPercentage(crypto.price_change_percentage_24h)}
+              </p>
+            </div>
+          </div>
+        </div>
+      </Link>
+    );
+  }
+
+  return (
+    <Link href={`/coin/${crypto.id}`}>
+      <Card
+        className="cyber-card hover:neon-glow cursor-pointer transition-all duration-300 group overflow-hidden"
+        onClick={onClick}
+      >
+        <div className="p-4 space-y-3">
+          {/* Header */}
+          <div className="flex items-start justify-between">
+            <div className="flex items-center gap-3">
+              <img src={crypto.image} alt={crypto.name} className="w-10 h-10 rounded-full" />
+              <div>
+                <h3 className="font-bold text-lg group-hover:text-neon-green transition-colors">
+                  {crypto.name}
+                </h3>
+                <p className="text-xs text-muted-foreground">{crypto.symbol.toUpperCase()}</p>
+              </div>
+            </div>
+            {crypto.market_cap_rank && (
+              <Badge variant="outline" className="text-xs">
+                #{crypto.market_cap_rank}
+              </Badge>
+            )}
+          </div>
+
+          {/* Price and Change */}
+          <div className="space-y-1">
+            <p className="text-2xl font-bold text-neon-green">
+              {formatCurrency(crypto.current_price, currency)}
+            </p>
+            <div className="flex items-center gap-2">
+              {isPositive ? (
+                <TrendingUp className="w-4 h-4 text-green-500" />
+              ) : (
+                <TrendingDown className="w-4 h-4 text-red-500" />
+              )}
+              <span className={`font-semibold ${getPercentageColorClass(crypto.price_change_percentage_24h)}`}>
+                {formatPercentage(crypto.price_change_percentage_24h)} (24h)
+              </span>
+            </div>
+          </div>
+
+          {/* Stats */}
+          <div className="grid grid-cols-2 gap-2 pt-2 border-t border-border">
+            <div>
+              <p className="text-xs text-muted-foreground">Market Cap</p>
+              <p className="font-semibold text-sm">{formatCurrency(crypto.market_cap, currency, 0)}</p>
+            </div>
+            <div>
+              <p className="text-xs text-muted-foreground">Volume (24h)</p>
+              <p className="font-semibold text-sm">{formatCurrency(crypto.total_volume, currency, 0)}</p>
+            </div>
+            <div>
+              <p className="text-xs text-muted-foreground">High (24h)</p>
+              <p className="font-semibold text-sm">{formatCurrency(crypto.high_24h, currency)}</p>
+            </div>
+            <div>
+              <p className="text-xs text-muted-foreground">Low (24h)</p>
+              <p className="font-semibold text-sm">{formatCurrency(crypto.low_24h, currency)}</p>
+            </div>
+          </div>
+        </div>
+      </Card>
+    </Link>
+  );
+}

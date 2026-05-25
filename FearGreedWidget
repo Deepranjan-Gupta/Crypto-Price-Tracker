@@ -1,0 +1,121 @@
+import React from 'react';
+import { Card } from '@/components/ui/card';
+import { useCrypto } from '@/contexts/CryptoContext';
+import { Skeleton } from '@/components/ui/skeleton';
+
+export function FearGreedWidget() {
+  const { fearGreedIndex, isLoading } = useCrypto();
+
+  if (isLoading || !fearGreedIndex) {
+    return <Skeleton className="w-full h-40" />;
+  }
+
+  const value = fearGreedIndex.value;
+  let classification = fearGreedIndex.valueClassification;
+  let color = 'text-yellow-500';
+  let bgColor = 'bg-yellow-500/10';
+
+  if (value <= 25) {
+    classification = 'Extreme Fear';
+    color = 'text-red-500';
+    bgColor = 'bg-red-500/10';
+  } else if (value <= 45) {
+    classification = 'Fear';
+    color = 'text-orange-500';
+    bgColor = 'bg-orange-500/10';
+  } else if (value <= 55) {
+    classification = 'Neutral';
+    color = 'text-yellow-500';
+    bgColor = 'bg-yellow-500/10';
+  } else if (value <= 75) {
+    classification = 'Greed';
+    color = 'text-green-500';
+    bgColor = 'bg-green-500/10';
+  } else {
+    classification = 'Extreme Greed';
+    color = 'text-green-600';
+    bgColor = 'bg-green-600/10';
+  }
+
+  // Calculate rotation for gauge
+  const rotation = (value / 100) * 180 - 90;
+
+  return (
+    <Card className="cyber-card overflow-hidden">
+      <div className="p-6">
+        <h3 className="text-lg font-bold mb-4">Fear & Greed Index</h3>
+
+        <div className="flex flex-col items-center justify-center space-y-4">
+          {/* Gauge Visualization */}
+          <div className="relative w-40 h-20">
+            {/* Gauge Background */}
+            <svg className="w-full h-full" viewBox="0 0 200 100">
+              {/* Fear side */}
+              <path
+                d="M 20 80 A 60 60 0 0 1 80 20"
+                fill="none"
+                stroke="rgba(239, 68, 68, 0.3)"
+                strokeWidth="8"
+              />
+              {/* Neutral side */}
+              <path
+                d="M 80 20 A 60 60 0 0 1 120 20"
+                fill="none"
+                stroke="rgba(234, 179, 8, 0.3)"
+                strokeWidth="8"
+              />
+              {/* Greed side */}
+              <path
+                d="M 120 20 A 60 60 0 0 1 180 80"
+                fill="none"
+                stroke="rgba(34, 197, 94, 0.3)"
+                strokeWidth="8"
+              />
+
+              {/* Needle */}
+              <g transform={`translate(100, 80) rotate(${rotation})`}>
+                <line x1="0" y1="0" x2="0" y2="-55" stroke="#00ff41" strokeWidth="2" />
+                <circle cx="0" cy="0" r="4" fill="#00ff41" />
+              </g>
+            </svg>
+
+            {/* Center Value */}
+            <div className="absolute inset-0 flex items-center justify-center">
+              <div className="text-center">
+                <p className={`text-3xl font-bold ${color}`}>{value}</p>
+              </div>
+            </div>
+          </div>
+
+          {/* Classification */}
+          <div className={`text-center px-4 py-2 rounded-lg ${bgColor}`}>
+            <p className={`font-semibold ${color}`}>{classification}</p>
+            <p className="text-xs text-muted-foreground mt-1">
+              {classification.includes('Fear')
+                ? 'Market showing signs of fear'
+                : classification.includes('Greed')
+                  ? 'Market showing signs of greed'
+                  : 'Market in neutral state'}
+            </p>
+          </div>
+
+          {/* Legend */}
+          <div className="w-full grid grid-cols-3 gap-2 text-xs">
+            <div className="text-center">
+              <p className="text-red-500 font-semibold">Fear</p>
+              <p className="text-muted-foreground">0-50</p>
+            </div>
+            <div className="text-center">
+              <p className="text-yellow-500 font-semibold">Neutral</p>
+              <p className="text-muted-foreground">50</p>
+            </div>
+            <div className="text-center">
+              <p className="text-green-500 font-semibold">Greed</p>
+              <p className="text-muted-foreground">50-100</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </Card>
+  );
+}

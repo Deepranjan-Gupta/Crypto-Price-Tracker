@@ -1,0 +1,270 @@
+import React, { useState } from 'react';
+import DashboardLayout from '@/components/DashboardLayout';
+import { PriceChart, Sparkline } from '@/components/PriceChart';
+import { useCoinData, usePriceHistory } from '@/hooks/useCryptoData';
+import { useCrypto } from '@/contexts/CryptoContext';
+import { formatCurrency, formatPercentage, formatCompactNumber, getPercentageColorClass } from '@/utils/formatters';
+import { Card } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Skeleton } from '@/components/ui/skeleton';
+import { useRoute } from 'wouter';
+import { Heart, Share2, TrendingUp, TrendingDown } from 'lucide-react';
+import { toast } from 'sonner';
+import { trpc } from '@/lib/trpc';
+
+type Timeframe = '1' | '7' | '30' | '365';
+
+export default function CoinDetails() {
+  const [, params] = useRoute('/coin/:id');
+  const coinId = params?.id;
+  const { currency } = useCrypto();
+  const [timeframe, setTimeframe] = useState<Timeframe>('7');
+  const [isInWatchlist, setIsInWatchlist] = useState(false);
+
+  const { data: coin, loading: coinLoading } = useCoinData(coinId);
+  const { data: priceHistory, loading: historyLoading } = usePriceHistory(coinId, parseInt(timeframe));
+
+  // Check if in watchlist
+  const checkWatchlist = trpc.watchlist.isInWatchlist.useQuery(
+    { coinId: coinId || '' },
+    { enabled: !!coinId }
+  );
+
+  // Add to watchlist mutation
+  const addToWatchlistMutation = trpc.watchlist.addItem.useMutation({
+    onSuccess: () => {
+      setIsInWatchlist(true);
+      toast.success('Added to watchlist');
+      checkWatchlist.refetch();
+    },
+    onError: (error) => {
+      toast.error(error.message || 'Failed to add to watchlist');
+    },
+  });
+
+  // Remove from watchlist mutation
+  const removeFromWatchlistMutation = trpc.watchlist.removeItem.useMutation({
+    onSuccess: () => {
+      setIsInWatchlist(false);
+      toast.success('Removed from watchlist');
+      checkWatchlist.refetch();
+    },
+  });
+
+  const handleWatchlistToggle = () => {
+    if (!coin) return;
+
+    if (isInWatchlist) {
+      removeFromWatchlistMutation.mutate({ id: 0 }); // ID would come from watchlist item
+    } else {
+      addToWatchlistMutation.mutate({
+        coinId: coin.id,
+        coinName: coin.name,
+        coinSymbol: coin.symbol,
+      });
+    }
+  };
+
+  if (!coinId) {
+    return (
+      <DashboardLayout>
+        <div className="text-center py-12">
+          <p className="text-muted-foreground">Coin not found</p>
+        </div>
+      </DashboardLayout>
+    );
+  }
+
+  return (
+    <DashboardLayout>
+      <div className="space-y-6">
+        {/* Header */}
+        {coinLoading ? (
+          <Skeleton className="h-24" />
+        ) : coin ? (
+          <div className="flex items-start justify-between">
+            <div className="flex items-start gap-4">
+              <img src={coin.image} alt={coin.name} className="w-16 h-16 rounded-full" />
+              <div>
+                <div className="flex items-center gap-2 mb-2">
+                  <h1 className="text-4xl font-bold text-neon-green">{coin.name}</h1>
+                  <Badge variant="outline">{coin.symbol.toUpperCase()}</Badge>
+                  {coin.market_cap_rank && (
+                    <Badge variant="outline">#{coin.market_cap_rank}</Badge>
+                  )}
+                </div>
+                <p className="text-lg font-semibold text-neon-cyan">
+                  {formatCurrency(coin.current_price, currency)}
+                </p>
+              </div>
+            </div>
+
+            <div className="flex gap-2">
+              <Button
+                variant={isInWatchlist ? 'default' : 'outline'}
+                size="sm"
+                onClick={handleWatchlistToggle}
+                className="gap-2"
+              >
+                <Heart className={`w-4 h-4 ${isInWatchlist ? 'fill-current' : ''}`} />
+                {isInWatchlist ? 'In Watchlist' : 'Add to Watchlist'}
+              </Button>
+              <Button variant="outline" size="sm" className="gap-2">
+                <Share2 className="w-4 h-4" />
+                Share
+              </Button>
+            </div>
+          </div>
+        ) : null}
+
+        {/* Price Change Stats */}
+        {coin && (
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+            <Card className="cyber-card">
+              <div className="p-4">
+                <p className="text-xs text-muted-foreground mb-1">24h Change</p>
+                <div className="flex items-center gap-2">
+                  {(coin.price_change_percentage_24h ?? 0) >= 0 ? (
+                    <TrendingUp className="w-4 h-4 text-green-500" />
+                  ) : (
+                    <TrendingDown className="w-4 h-4 text-red-500" />
+                  )}
+                  <p className={`font-bold text-lg ${getPercentageColorClass(coin.price_change_percentage_24h)}`}>
+                    {formatPercentage(coin.price_change_percentage_24h)}
+                  </p>
+                </div>
+              </div>
+            </Card>
+
+            <Card className="cyber-card">
+              <div className="p-4">
+                <p className="text-xs text-muted-foreground mb-1">7d Change</p>
+                <p className={`font-bold text-lg ${getPercentageColorClass(coin.price_change_percentage_7d)}`}>
+                  {formatPercentage(coin.price_change_percentage_7d)}
+                </p>
+              </div>
+            </Card>
+
+            <Card className="cyber-card">
+              <div className="p-4">
+                <p className="text-xs text-muted-foreground mb-1">30d Change</p>
+                <p className={`font-bold text-lg ${getPercentageColorClass(coin.price_change_percentage_30d)}`}>
+                  {formatPercentage(coin.price_change_percentage_30d)}
+                </p>
+              </div>
+            </Card>
+
+            <Card className="cyber-card">
+              <div className="p-4">
+                <p className="text-xs text-muted-foreground mb-1">1y Change</p>
+                <p className={`font-bold text-lg ${getPercentageColorClass(coin.price_change_percentage_1y)}`}>
+                  {formatPercentage(coin.price_change_percentage_1y)}
+                </p>
+              </div>
+            </Card>
+          </div>
+        )}
+
+        {/* Price Chart */}
+        <Card className="cyber-card">
+          <div className="p-6">
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-xl font-bold text-neon-green">Price Chart</h2>
+              <div className="flex gap-2">
+                {(['1', '7', '30', '365'] as Timeframe[]).map((tf) => (
+                  <Button
+                    key={tf}
+                    variant={timeframe === tf ? 'default' : 'outline'}
+                    size="sm"
+                    onClick={() => setTimeframe(tf)}
+                    className="text-xs"
+                  >
+                    {tf === '1' ? '1D' : tf === '7' ? '7D' : tf === '30' ? '30D' : '1Y'}
+                  </Button>
+                ))}
+              </div>
+            </div>
+
+            {historyLoading ? (
+              <Skeleton className="w-full h-80" />
+            ) : (
+              <PriceChart
+                data={priceHistory}
+                height={400}
+                type="area"
+                isPositive={(coin?.price_change_percentage_24h ?? 0) >= 0}
+              />
+            )}
+          </div>
+        </Card>
+
+        {/* Market Stats */}
+        {coin && (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            <Card className="cyber-card">
+              <div className="p-4 space-y-2">
+                <p className="text-sm text-muted-foreground">Market Cap</p>
+                <p className="text-xl font-bold text-neon-green">
+                  {formatCurrency(coin.market_cap, currency, 0)}
+                </p>
+              </div>
+            </Card>
+
+            <Card className="cyber-card">
+              <div className="p-4 space-y-2">
+                <p className="text-sm text-muted-foreground">24h Volume</p>
+                <p className="text-xl font-bold text-neon-cyan">
+                  {formatCurrency(coin.total_volume, currency, 0)}
+                </p>
+              </div>
+            </Card>
+
+            <Card className="cyber-card">
+              <div className="p-4 space-y-2">
+                <p className="text-sm text-muted-foreground">Circulating Supply</p>
+                <p className="text-xl font-bold">
+                  {formatCompactNumber(coin.circulating_supply)} {coin.symbol.toUpperCase()}
+                </p>
+              </div>
+            </Card>
+
+            <Card className="cyber-card">
+              <div className="p-4 space-y-2">
+                <p className="text-sm text-muted-foreground">Total Supply</p>
+                <p className="text-xl font-bold">
+                  {formatCompactNumber(coin.total_supply)} {coin.symbol.toUpperCase()}
+                </p>
+              </div>
+            </Card>
+
+            <Card className="cyber-card">
+              <div className="p-4 space-y-2">
+                <p className="text-sm text-muted-foreground">All Time High</p>
+                <p className="text-xl font-bold text-green-500">
+                  {formatCurrency(coin.ath, currency)}
+                </p>
+                <p className="text-xs text-muted-foreground">
+                  {formatPercentage(coin.ath_change_percentage)} from ATH
+                </p>
+              </div>
+            </Card>
+
+            <Card className="cyber-card">
+              <div className="p-4 space-y-2">
+                <p className="text-sm text-muted-foreground">All Time Low</p>
+                <p className="text-xl font-bold text-red-500">
+                  {formatCurrency(coin.atl, currency)}
+                </p>
+                <p className="text-xs text-muted-foreground">
+                  {formatPercentage(coin.atl_change_percentage)} from ATL
+                </p>
+              </div>
+            </Card>
+          </div>
+        )}
+      </div>
+    </DashboardLayout>
+  );
+}

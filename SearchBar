@@ -1,0 +1,89 @@
+import React, { useState } from 'react';
+import { Input } from '@/components/ui/input';
+import { useSearchCoins } from '@/hooks/useCryptoData';
+import { Search, X } from 'lucide-react';
+import { Link } from 'wouter';
+import { Skeleton } from '@/components/ui/skeleton';
+
+interface SearchBarProps {
+  onSelect?: (coinId: string) => void;
+  placeholder?: string;
+}
+
+export function SearchBar({ onSelect, placeholder = 'Search cryptocurrencies...' }: SearchBarProps) {
+  const [query, setQuery] = useState('');
+  const [isOpen, setIsOpen] = useState(false);
+  const { results, loading } = useSearchCoins(query);
+
+  const handleSelect = (coinId: string) => {
+    setQuery('');
+    setIsOpen(false);
+    onSelect?.(coinId);
+  };
+
+  const handleClear = () => {
+    setQuery('');
+    setIsOpen(false);
+  };
+
+  return (
+    <div className="relative w-full">
+      <div className="relative">
+        <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-muted-foreground pointer-events-none" />
+        <Input
+          type="text"
+          placeholder={placeholder}
+          value={query}
+          onChange={(e) => {
+            setQuery(e.target.value);
+            setIsOpen(true);
+          }}
+          onFocus={() => setIsOpen(true)}
+          className="pl-10 pr-10 bg-input border-border hover:border-neon-green focus:border-neon-cyan focus:ring-neon-cyan"
+        />
+        {query && (
+          <button
+            onClick={handleClear}
+            className="absolute right-3 top-1/2 transform -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
+          >
+            <X className="w-4 h-4" />
+          </button>
+        )}
+      </div>
+
+      {/* Dropdown Results */}
+      {isOpen && query.length > 0 && (
+        <div className="absolute top-full left-0 right-0 mt-2 bg-card border border-border rounded-lg shadow-lg z-50 max-h-96 overflow-y-auto">
+          {loading ? (
+            <div className="p-4 space-y-2">
+              {[...Array(3)].map((_, i) => (
+                <Skeleton key={i} className="h-12 w-full" />
+              ))}
+            </div>
+          ) : results.length > 0 ? (
+            <div className="divide-y divide-border">
+              {results.map((coin) => (
+                <Link key={coin.id} href={`/coin/${coin.id}`}>
+                  <button
+                    onClick={() => handleSelect(coin.id)}
+                    className="w-full px-4 py-3 flex items-center gap-3 hover:bg-muted transition-colors text-left"
+                  >
+                    <img src={coin.thumb} alt={coin.name} className="w-8 h-8 rounded-full" />
+                    <div className="flex-1 min-w-0">
+                      <p className="font-semibold text-sm">{coin.name}</p>
+                      <p className="text-xs text-muted-foreground">{coin.symbol.toUpperCase()}</p>
+                    </div>
+                  </button>
+                </Link>
+              ))}
+            </div>
+          ) : (
+            <div className="p-4 text-center text-muted-foreground">
+              <p>No coins found</p>
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}

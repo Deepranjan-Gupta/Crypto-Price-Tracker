@@ -1,0 +1,107 @@
+import React, { useState, useEffect } from 'react';
+import { useCrypto } from '@/contexts/CryptoContext';
+import { formatTimeAgo } from '@/utils/formatters';
+import { RefreshCw } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from '@/components/ui/popover';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+
+export function AutoRefreshIndicator() {
+  const { lastUpdated, refreshInterval, setRefreshInterval, refreshPrices, isLoading } = useCrypto();
+  const [timeAgo, setTimeAgo] = useState('');
+  const [tempInterval, setTempInterval] = useState(refreshInterval);
+
+  useEffect(() => {
+    if (!lastUpdated) return;
+
+    const updateTimeAgo = () => {
+      setTimeAgo(formatTimeAgo(lastUpdated));
+    };
+
+    updateTimeAgo();
+    const interval = setInterval(updateTimeAgo, 60000); // Update every minute
+
+    return () => clearInterval(interval);
+  }, [lastUpdated]);
+
+  const handleIntervalChange = (value: number) => {
+    if (value > 0) {
+      setTempInterval(value);
+      setRefreshInterval(value);
+    }
+  };
+
+  return (
+    <div className="flex items-center gap-2">
+      <Button
+        variant="outline"
+        size="sm"
+        onClick={refreshPrices}
+        disabled={isLoading}
+        className="gap-2 border-border hover:border-neon-green"
+      >
+        <RefreshCw className={`w-4 h-4 ${isLoading ? 'animate-spin' : ''}`} />
+        Refresh
+      </Button>
+
+      <Popover>
+        <PopoverTrigger asChild>
+          <Button variant="ghost" size="sm" className="text-xs text-muted-foreground hover:text-foreground">
+            {lastUpdated ? `Updated ${timeAgo}` : 'Loading...'}
+          </Button>
+        </PopoverTrigger>
+        <PopoverContent className="w-64 bg-card border-border">
+          <div className="space-y-4">
+            <div>
+              <h4 className="font-semibold mb-2">Auto-Refresh Settings</h4>
+              <p className="text-xs text-muted-foreground mb-3">
+                Prices will automatically refresh at the interval you set below.
+              </p>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="refresh-interval">Refresh Interval (seconds)</Label>
+              <div className="flex gap-2">
+                <Input
+                  id="refresh-interval"
+                  type="number"
+                  min="5"
+                  max="300"
+                  value={tempInterval}
+                  onChange={(e) => handleIntervalChange(parseInt(e.target.value))}
+                  className="bg-input border-border"
+                />
+                <span className="text-sm text-muted-foreground self-center">sec</span>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-3 gap-2">
+              {[10, 30, 60].map((interval) => (
+                <Button
+                  key={interval}
+                  variant={tempInterval === interval ? 'default' : 'outline'}
+                  size="sm"
+                  onClick={() => handleIntervalChange(interval)}
+                  className="text-xs"
+                >
+                  {interval}s
+                </Button>
+              ))}
+            </div>
+
+            <div className="pt-2 border-t border-border">
+              <p className="text-xs text-muted-foreground">
+                Last updated: {lastUpdated ? lastUpdated.toLocaleTimeString() : 'Never'}
+              </p>
+            </div>
+          </div>
+        </PopoverContent>
+      </Popover>
+    </div>
+  );
+}

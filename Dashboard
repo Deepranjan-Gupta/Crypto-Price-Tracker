@@ -1,0 +1,218 @@
+import React, { useState } from 'react';
+import DashboardLayout from '@/components/DashboardLayout';
+import { CryptoCard } from '@/components/CryptoCard';
+import { FearGreedWidget } from '@/components/FearGreedWidget';
+import { NewsCard } from '@/components/NewsCard';
+import { useCrypto } from '@/contexts/CryptoContext';
+import { getTopGainers, getTopLosers } from '@/services/coingeckoApi';
+import { getCryptoNews } from '@/services/newsApi';
+import { formatCurrency, formatCompactNumber } from '@/utils/formatters';
+import { Card } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Skeleton } from '@/components/ui/skeleton';
+import type { CryptoNews } from '@shared/types';
+import { TrendingUp, TrendingDown, DollarSign, Activity } from 'lucide-react';
+import { useEffect, useCallback } from 'react';
+
+export default function Dashboard() {
+  const { prices, currency, marketOverview, isLoading } = useCrypto();
+  const [news, setNews] = useState<CryptoNews[]>([]);
+  const [newsLoading, setNewsLoading] = useState(false);
+  const [topGainers, setTopGainers] = useState<any[]>([]);
+  const [topLosers, setTopLosers] = useState<any[]>([]);
+  const [gainersLoading, setGainersLoading] = useState(false);
+
+  // Fetch news and gainers/losers
+  useEffect(() => {
+    const fetchData = async () => {
+      setNewsLoading(true);
+      setGainersLoading(true);
+      try {
+        const [newsData, gainers, losers] = await Promise.all([
+          getCryptoNews(6),
+          getTopGainers(currency),
+          getTopLosers(currency),
+        ]);
+        setNews(newsData);
+        setTopGainers(gainers);
+        setTopLosers(losers);
+      } catch (error) {
+        console.error('Error fetching dashboard data:', error);
+      } finally {
+        setNewsLoading(false);
+        setGainersLoading(false);
+      }
+    };
+
+    fetchData();
+  }, [currency]);
+
+  const topCryptos = Array.from(prices.values()).slice(0, 10);
+
+  return (
+    <DashboardLayout>
+      <div className="space-y-6">
+        {/* Market Overview */}
+        {marketOverview && (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+            <Card className="cyber-card">
+              <div className="p-4 space-y-2">
+                <div className="flex items-center justify-between">
+                  <span className="text-sm text-muted-foreground">Total Market Cap</span>
+                  <DollarSign className="w-4 h-4 text-neon-green" />
+                </div>
+                <p className="text-2xl font-bold text-neon-green">
+                  {formatCurrency(marketOverview.totalMarketCap, currency, 0)}
+                </p>
+                <p className={`text-xs font-semibold ${marketOverview.marketCapChangePercentage24h >= 0 ? 'text-green-500' : 'text-red-500'}`}>
+                  {marketOverview.marketCapChangePercentage24h >= 0 ? '+' : ''}
+                  {marketOverview.marketCapChangePercentage24h.toFixed(2)}% (24h)
+                </p>
+              </div>
+            </Card>
+
+            <Card className="cyber-card">
+              <div className="p-4 space-y-2">
+                <div className="flex items-center justify-between">
+                  <span className="text-sm text-muted-foreground">24h Volume</span>
+                  <Activity className="w-4 h-4 text-neon-cyan" />
+                </div>
+                <p className="text-2xl font-bold text-neon-cyan">
+                  {formatCompactNumber(marketOverview.totalVolume)}
+                </p>
+                <p className="text-xs text-muted-foreground">Global trading volume</p>
+              </div>
+            </Card>
+
+            <Card className="cyber-card">
+              <div className="p-4 space-y-2">
+                <span className="text-sm text-muted-foreground">BTC Dominance</span>
+                <p className="text-2xl font-bold">{marketOverview.btcDominance.toFixed(2)}%</p>
+                <div className="w-full bg-muted rounded-full h-2">
+                  <div
+                    className="bg-neon-green h-2 rounded-full"
+                    style={{ width: `${Math.min(marketOverview.btcDominance, 100)}%` }}
+                  />
+                </div>
+              </div>
+            </Card>
+
+            <Card className="cyber-card">
+              <div className="p-4 space-y-2">
+                <span className="text-sm text-muted-foreground">Active Coins</span>
+                <p className="text-2xl font-bold">{marketOverview.activeCoins}</p>
+                <p className="text-xs text-muted-foreground">Trading today</p>
+              </div>
+            </Card>
+          </div>
+        )}
+
+        {/* Main Content Grid */}
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          {/* Left Column - Top Cryptos & Gainers/Losers */}
+          <div className="lg:col-span-2 space-y-6">
+            {/* Top Cryptocurrencies */}
+            <div>
+              <h2 className="text-2xl font-bold mb-4 text-neon-green">Top Cryptocurrencies</h2>
+              {isLoading ? (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {[...Array(6)].map((_, i) => (
+                    <Skeleton key={i} className="h-64" />
+                  ))}
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {topCryptos.map((crypto) => (
+                    <CryptoCard key={crypto.id} crypto={crypto} />
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* Gainers & Losers */}
+            <div>
+              <h2 className="text-2xl font-bold mb-4 text-neon-green">Market Movers</h2>
+              <Tabs defaultValue="gainers" className="w-full">
+                <TabsList className="grid w-full grid-cols-2 bg-muted">
+                  <TabsTrigger value="gainers" className="data-[state=active]:bg-neon-green data-[state=active]:text-navy-950">
+                    <TrendingUp className="w-4 h-4 mr-2" />
+                    Top Gainers
+                  </TabsTrigger>
+                  <TabsTrigger value="losers" className="data-[state=active]:bg-neon-pink data-[state=active]:text-white">
+                    <TrendingDown className="w-4 h-4 mr-2" />
+                    Top Losers
+                  </TabsTrigger>
+                </TabsList>
+
+                <TabsContent value="gainers" className="space-y-2 mt-4">
+                  {gainersLoading ? (
+                    <div className="space-y-2">
+                      {[...Array(5)].map((_, i) => (
+                        <Skeleton key={i} className="h-16" />
+                      ))}
+                    </div>
+                  ) : (
+                    topGainers.map((crypto) => (
+                      <CryptoCard key={crypto.id} crypto={crypto} compact />
+                    ))
+                  )}
+                </TabsContent>
+
+                <TabsContent value="losers" className="space-y-2 mt-4">
+                  {gainersLoading ? (
+                    <div className="space-y-2">
+                      {[...Array(5)].map((_, i) => (
+                        <Skeleton key={i} className="h-16" />
+                      ))}
+                    </div>
+                  ) : (
+                    topLosers.map((crypto) => (
+                      <CryptoCard key={crypto.id} crypto={crypto} compact />
+                    ))
+                  )}
+                </TabsContent>
+              </Tabs>
+            </div>
+          </div>
+
+          {/* Right Column - Fear & Greed & News */}
+          <div className="space-y-6">
+            {/* Fear & Greed Index */}
+            <FearGreedWidget />
+
+            {/* Latest News */}
+            <div>
+              <h3 className="text-lg font-bold mb-4 text-neon-green">Latest News</h3>
+              {newsLoading ? (
+                <div className="space-y-3">
+                  {[...Array(3)].map((_, i) => (
+                    <Skeleton key={i} className="h-48" />
+                  ))}
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  {news.slice(0, 3).map((article) => (
+                    <NewsCard key={article.id} news={article} />
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+
+        {/* All News Section */}
+        {news.length > 3 && (
+          <div>
+            <h2 className="text-2xl font-bold mb-4 text-neon-green">All News</h2>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              {news.map((article) => (
+                <NewsCard key={article.id} news={article} />
+              ))}
+            </div>
+          </div>
+        )}
+      </div>
+    </DashboardLayout>
+  );
+}
